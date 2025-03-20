@@ -1,3 +1,4 @@
+import { DatabaseService } from './modules/Database/database.service';
 import { DataInsightModule } from './modules/data-insight.module';
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
@@ -7,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
   imports: [
     DataInsightModule, ConfigModule.forRoot()],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    DatabaseService, AppService],
 })
 export class AppModule { }
