@@ -1,12 +1,13 @@
-import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
+
+import { Controller, Get, Query, BadRequestException, Body, Post } from '@nestjs/common';
 import { AiService } from './ai.service';
+import { ApiBody } from '@nestjs/swagger';
 
 @Controller('ai')
 export class AiController {
     constructor(private readonly aiService: AiService) { }
 
-    // Endpoint example: /ai/generate?csvUploadId=YOUR_CSV_ID&company=AcmeInc
-    @Get('generate')
+    @Get('description')
     async generateDescription(
         @Query('filename') filename: string,
         @Query('csvUploadId') csvUploadId: string,
@@ -17,5 +18,21 @@ export class AiController {
         }
         const result = await this.aiService.generateColumnDescriptions(filename, csvUploadId, company);
         return result;
+    }
+
+    @Post('prompt')
+    @ApiBody({
+        description: 'User prompt to process',
+        schema: {
+            example: {
+                userPrompt: 'I want to get all unique countries from worldcities_csv_c8581ce0-0090-473f-83ae-dad2831a459a'
+            }
+        }
+    })
+    async processNaturalPrompt(@Body('userPrompt') userPrompt: string) {
+        if (!userPrompt) {
+            throw new BadRequestException('Missing prompt parameter');
+        }
+        return await this.aiService.processUserQuery(userPrompt);
     }
 }

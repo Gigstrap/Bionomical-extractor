@@ -77,4 +77,31 @@ export class ArangoService implements OnModuleInit {
 
     }
 
+    async executeAqlQuery(aqlQuery: any) {
+        try {
+            const cursor = await this.db.query(aqlQuery);
+            const result = await cursor.all();
+            this.logger.log('AQL Query Result:', result);
+            return result;
+        } catch (error) {
+            this.logger.error('Error executing AQL query:', error);
+            throw new Error('Failed to execute AQL query.');
+        }
+    }
+
+    async getSampleDocuments(collectionName: string, limit: number = 5): Promise<any[]> {
+        try {
+            // Use this.db.collection(collectionName) to properly quote the collection name.
+            const query = aql`
+                FOR doc IN ${this.db.collection(collectionName)}
+                LIMIT ${limit}
+                RETURN doc
+            `;
+            return await this.executeAqlQuery(query);
+        } catch (error) {
+            this.logger.error(`Error fetching sample documents from ${collectionName}:`, error);
+            return [];
+        }
+    }
+
 }

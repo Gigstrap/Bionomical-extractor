@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Groq } from 'groq-sdk';
 import { ArangoService } from '../db/arango.service';
+import { prompts } from './prompts';
 
 @Injectable()
 export class AiService {
@@ -12,7 +13,7 @@ export class AiService {
     async generateColumnDescriptions(filename: string, csvUploadId: string, company: string) {
         try {
             const csvCollectionName = `${filename}_csv_${csvUploadId}`;
-            const descCollectionName = `${filename}_desc_${csvUploadId}`;
+            const descCollectionName = `${filename}_description_${csvUploadId}`;
 
             // Retrieve column names from the specific CSV collection.
             const columnNames = await this.arangoService.getCollectionColumnNames(csvCollectionName);
@@ -30,22 +31,8 @@ export class AiService {
                 })
             );
 
-            const fullPrompt = `
-    You are given data from the company "${company}" uploaded in CSV file "${filename}" (ID: "${csvUploadId}"). 
-    For each field, use the field name and the first 100 sample values to generate a descriptive explanation of what the field represents. So please analyze what each field is about and write a detailed description.
-    
-    ${promptParts.join('\n')}
-    
-    Return the response as a valid JSON array with objects in this format:
-    [
-      { "field": "fieldName", "description": "description of field" },
-      { "field": "fieldName", "description": "description of field" }
-    ]
-      and don't add any additional text to the response.
-    `;
-
             // Fetch AI-generated descriptions
-            const aiResponse = await this.fetchResponse(fullPrompt);
+            const aiResponse = await this.fetchResponse(prompts.GENERATE_COLUMN_DESCRIPTIONS(filename, csvUploadId, company, promptParts));
             this.logger.log('AI Response:', aiResponse);
 
             // Ensure the response is a valid JSON array
@@ -69,7 +56,65 @@ export class AiService {
         }
     }
 
+    async processUserQuery(userQuery: string) {
+        try {
+            // Extract collection name from the user's query
+            const collectionName = await this.extractCollectionName(userQuery);
+            if (!collectionName) {
+                throw new Error('Could not determine the collection name from user query.');
+            }
 
+            // Fetch some sample documents from the collection to understand its structure
+            const sampleDocs = await this.arangoService.getSampleDocuments(collectionName, 5);
+            if (!sampleDocs.length) {
+                throw new Error(`No sample documents found in collection: ${collectionName}`);
+            }
+
+            // Get AI-generated AQL query
+            const aiResponse = await this.fetchResponse(prompts.GENERATE_AQL_QUERY(collectionName, sampleDocs, userQuery));
+            this.logger.log('AI Response:', aiResponse);
+
+            let queryData: { collection: string; aql_query: string };
+            try {
+                queryData = JSON.parse(aiResponse);
+                if (!queryData.collection || !queryData.aql_query) {
+                    throw new Error('Invalid AI response format.');
+                }
+            } catch (error) {
+                this.logger.error('Failed to parse AI response:', aiResponse);
+                throw new Error('AI response is not in valid JSON format.');
+            }
+
+            const collectionRegex = /(\bFOR\s+\w+\s+IN\s+)(`?)([^\s`]+)(`?)/i;
+            queryData.aql_query = queryData.aql_query.replace(collectionRegex, (match, prefix, openTick, colName, closeTick) => {
+                if (openTick !== '`' || closeTick !== '`') {
+                    return `${prefix}\`${colName}\``;
+                }
+                return match;
+            });
+
+            let queryResult: any;
+            try {
+                queryResult = await this.arangoService.executeAqlQuery(queryData.aql_query);
+            } catch (error) {
+                this.logger.error('Error executing the generated AQL query:', error);
+                return {
+                    collection: queryData.collection,
+                    aql_query: queryData.aql_query,
+                    error: 'The generated AQL query failed to execute. Please refine your prompt or try again.'
+                };
+            }
+
+            return {
+                collection: queryData.collection,
+                aql_query: queryData.aql_query,
+                result: queryResult,
+            };
+        } catch (error) {
+            this.logger.error('Error processing AI query:', error);
+            throw new Error('Failed to process AI query.');
+        }
+    }
 
     private async fetchResponse(prompt: string): Promise<string> {
         try {
@@ -82,25 +127,30 @@ export class AiService {
                 ],
                 model: 'llama-3.3-70b-versatile',
             });
-
             const rawResponse = response.choices[0]?.message?.content || 'No response available';
-            this.logger.log('Raw AI Response:', rawResponse);
-
-            // Extract only JSON part from the response
-            const jsonMatch = rawResponse.match(/```json\n([\s\S]+?)\n```/);
-            if (jsonMatch && jsonMatch[1]) {
-                return jsonMatch[1].trim();
-            }
-
-            // If AI response contains valid JSON directly (without markdown)
-            if (rawResponse.startsWith('[') && rawResponse.endsWith(']')) {
-                return rawResponse;
-            }
-
-            throw new Error('AI response does not contain valid JSON.');
+            this.logger.log('Raw AI Response from groq:', rawResponse);
+            return rawResponse;
         } catch (error) {
             throw new Error('Failed to fetch AI response.');
         }
     }
 
+    private async extractCollectionName(userQuery: string): Promise<string | null> {
+        try {
+            const aiResponse = await this.fetchResponse(prompts.EXTRACT_COLLECTION_NAME(userQuery));
+            this.logger.log('AI Extracted Collection Name:', aiResponse);
+
+            let collectionData: { collection: string | null };
+            try {
+                collectionData = JSON.parse(aiResponse);
+                return collectionData.collection ?? null;
+            } catch (error) {
+                this.logger.error('Failed to parse AI response:', aiResponse);
+                return null;
+            }
+        } catch (error) {
+            this.logger.error('Error extracting collection name via AI:', error);
+            return null;
+        }
+    }
 }
