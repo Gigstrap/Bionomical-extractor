@@ -11,7 +11,7 @@ export class CsvService {
 
     constructor(private readonly arangoService: ArangoService) { }
 
-    async processAndStore(fileBuffer: Buffer, originalFilename: string): Promise<{ csvUploadId: string; importResult: any }> {
+    async processAndStore(fileBuffer: Buffer, originalFilename: string): Promise<{ filename: string; csvUploadId: string; importResult: any }> {
         const csvUploadId = uuidv4();
         const filename = path.basename(originalFilename, path.extname(originalFilename)).replace(/\s+/g, '_');
         const csvCollectionName = `${filename}_csv_${csvUploadId}`;
@@ -27,7 +27,7 @@ export class CsvService {
                     try {
                         const importResult = await this.arangoService.insertData(csvCollectionName, results);
                         this.logger.log(`Inserted ${results.length} documents into collection ${csvCollectionName}`);
-                        resolve({ csvUploadId, importResult });
+                        resolve({ filename, csvUploadId, importResult });
                     } catch (error) {
                         this.logger.error('Error inserting data into ArangoDB', error);
                         reject(error);

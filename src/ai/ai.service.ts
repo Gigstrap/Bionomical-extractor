@@ -32,7 +32,7 @@ export class AiService {
 
             const fullPrompt = `
     You are given data from the company "${company}" uploaded in CSV file "${filename}" (ID: "${csvUploadId}"). 
-    For each field, use the field name and the first 100 sample values to generate a descriptive explanation of what the field represents.
+    For each field, use the field name and the first 100 sample values to generate a descriptive explanation of what the field represents. So please analyze what each field is about and write a detailed description.
     
     ${promptParts.join('\n')}
     
