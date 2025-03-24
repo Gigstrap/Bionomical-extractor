@@ -75,7 +75,7 @@ export class AiService {
             }
 
             // Fetch some sample documents from the collection to understand its structure
-            const sampleDocs = await this.arangoService.getSampleDocuments(collectionName, 10);
+            const sampleDocs = await this.arangoService.getSampleDocuments(collectionName, 20);
             if (!sampleDocs.length) {
                 throw new Error(`No sample documents found in collection: ${collectionName}`);
             }
