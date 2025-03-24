@@ -5,12 +5,13 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
+import { CollectionsController } from './collections/collections.controller';
 @Module({
   imports: [
     AiModule,
     CsvModule,
     ConfigModule.forRoot()],
-  controllers: [AppController],
+  controllers: [AppController, CollectionsController],
   providers: [
     ArangoService, AppService],
 })
