@@ -46,28 +46,7 @@ export const prompts = {
         "aql_query": "AQL query here"
       }
       
-      **Note**: Do not include any explanations, comments, or additional text beyond the JSON response. And dont return response in code blocks, only expected json.
-  `,
-
-  EXTRACT_COLLECTION_NAME: (userQuery: string) => `You are an expert in understanding user queries and extracting the correct database collection name. 
-          The user will provide a request that contains a reference to a collection name. 
-          Your task is to extract the exact collection name from the request.
-          
-          ### Rules:
-          - The collection name will be a single word or a hyphen/underscore-separated string.
-          - Only return the collection name, nothing else.
-          - If no collection name is found, return "null".
-          
-          ### User Request:
-          "${userQuery}"
-          
-          ### Expected Output Format:
-          {
-          "collection": "extracted_collection_name"
-          }
-
-          dont add any additional text or code blocks to the response, only return the collection name in given json format.`,
-
+      **Note**: Do not include any explanations, comments, or additional text beyond the JSON response. And dont return response in code blocks, only expected json.`,
   GENERATE_COLUMN_DESCRIPTIONS: (filename: string, csvUploadId: string, company: string, promptParts: string[]) => `You are given data from the company "${company}" uploaded in CSV file "${filename}" (ID: "${csvUploadId}"). 
   For each field, use the field name and the first 100 sample values to generate a descriptive explanation of what the field represents. So please analyze what each field is about and write a detailed description.
   

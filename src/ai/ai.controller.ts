@@ -1,4 +1,3 @@
-
 import { Controller, Get, Query, BadRequestException, Body, Post } from '@nestjs/common';
 import { AiService } from './ai.service';
 import { ApiBody } from '@nestjs/swagger';
@@ -25,14 +24,16 @@ export class AiController {
         description: 'User prompt to process',
         schema: {
             example: {
-                userPrompt: 'I want to get all unique countries from worldcities_csv_c8581ce0-0090-473f-83ae-dad2831a459a'
+                "userPrompt": "From all the customers which one customer have the highest revenue of them all",
+                "collectionName": "ACDOCA_Sample_csv_d679d8f0-3efa-42bf-83d0-db1180a65ca0"
             }
         }
     })
-    async processNaturalPrompt(@Body('userPrompt') userPrompt: string) {
+    async processNaturalPrompt(@Body() body: { userPrompt: string; collectionName: string }) {
+        const { userPrompt, collectionName } = body;
         if (!userPrompt) {
             throw new BadRequestException('Missing prompt parameter');
         }
-        return await this.aiService.processUserQuery(userPrompt);
+        return await this.aiService.processUserQuery(userPrompt, collectionName);
     }
 }

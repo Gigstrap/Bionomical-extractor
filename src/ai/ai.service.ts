@@ -68,12 +68,10 @@ export class AiService {
         }
     }
 
-    async processUserQuery(userQuery: string) {
+    async processUserQuery(userQuery: string, collectionName: string) {
         try {
-            // Extract collection name from the user's query
-            const collectionName = await this.extractCollectionName(userQuery);
             if (!collectionName) {
-                throw new Error('Could not determine the collection name from user query.');
+                throw new Error('Collection name must be provided.');
             }
 
             // Fetch some sample documents from the collection to understand its structure
@@ -151,25 +149,6 @@ export class AiService {
             return rawResponse;
         } catch (error) {
             throw new Error('Failed to fetch AI response.');
-        }
-    }
-
-    private async extractCollectionName(userQuery: string): Promise<string | null> {
-        try {
-            const aiResponse = await this.fetchResponse(prompts.EXTRACT_COLLECTION_NAME(userQuery));
-            this.logger.log('AI Extracted Collection Name:', aiResponse);
-
-            let collectionData: { collection: string | null };
-            try {
-                collectionData = JSON.parse(aiResponse);
-                return collectionData.collection ?? null;
-            } catch (error) {
-                this.logger.error('Failed to parse AI response:', aiResponse);
-                return null;
-            }
-        } catch (error) {
-            this.logger.error('Error extracting collection name via AI:', error);
-            return null;
         }
     }
 
