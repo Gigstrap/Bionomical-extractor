@@ -3,7 +3,8 @@ export const prompts = {
     collectionName: string,
     sampleDocs: any[],
     userQuery: string,
-    descriptions: any[]
+    descriptions: any[],
+    datasetContext: string
   ) => `
       You are an expert in ArangoDB AQL queries. A user has provided a natural language request to retrieve data from a collection. Your task is to generate a valid AQL query based on this request.
       
@@ -13,6 +14,9 @@ export const prompts = {
       
       ### For context,Here are Schema Descriptions about key fields:
       ${descriptions && descriptions.length ? JSON.stringify(descriptions, null, 2) : "No schema descriptions available."}
+      
+      ### Additional Dataset Context:
+      ${datasetContext}
       
       **Important**: AQL is the query language for ArangoDB and differs from SQL. Do not use SQL syntax (e.g., SELECT, FROM, WHERE). Instead, use AQL syntax such as FOR, FILTER, RETURN, etc.
 
@@ -34,7 +38,7 @@ export const prompts = {
       - Use only field names present in the sample documents (e.g., doc.fieldName).
       - Spell field names exactly as they appear in the sample documents.
       - Handle data types correctly (e.g., strings in single quotes like 'value', numbers without quotes like 123).
-      - Base the query on the user’s request, adapting the syntax patterns or examples as needed.
+      - Base the query on the user's request, adapting the syntax patterns or examples as needed.
       - Ensure the query is syntactically valid for AQL.
       - Ensure that the predefined functions of sql are not valid in aql, so if you are using any predefined functions make sure they valid in aql.
 
@@ -44,7 +48,8 @@ export const prompts = {
       Return only valid JSON in this format:
       {
         "collection": "${collectionName}",
-        "aql_query": "AQL query here"
+        "aql_query": "AQL query here",
+        "explanation": "Explanation of what the AQL query does in the context of the user request."
       }
       
       **Note**: Do not include any explanations, comments, or additional text beyond the JSON response. And dont return response in code blocks, only expected json.`,
