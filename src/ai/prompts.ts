@@ -36,6 +36,7 @@ export const prompts = {
       - Handle data types correctly (e.g., strings in single quotes like 'value', numbers without quotes like 123).
       - Base the query on the user’s request, adapting the syntax patterns or examples as needed.
       - Ensure the query is syntactically valid for AQL.
+      - Ensure that the predefined functions of sql are not valid in aql, so if you are using any predefined functions make sure they valid in aql.
 
       ### User Request:
       "${userQuery}"

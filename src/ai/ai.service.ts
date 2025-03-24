@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Groq } from 'groq-sdk';
 import { ArangoService } from '../db/arango.service';
 import { prompts } from './prompts';
+import Anthropic from '@anthropic-ai/sdk';
 
 @Injectable()
 export class AiService {
@@ -135,23 +136,33 @@ export class AiService {
 
     private async fetchResponse(prompt: string): Promise<string> {
         try {
-            const response = await this.groq.chat.completions.create({
-                messages: [
-                    {
-                        role: 'user',
-                        content: prompt,
-                    },
-                ],
-                model: 'llama-3.3-70b-versatile',
+            const anthropic = new Anthropic({
+                apiKey: process.env.ANTHROPIC_API_KEY,
             });
-            const rawResponse = response.choices[0]?.message?.content || 'No response available';
-            this.logger.log('Raw AI Response from groq:', rawResponse);
+
+            const response = await anthropic.messages.create({
+                model: "claude-3-7-sonnet-20250219",
+                max_tokens: 1024,
+                messages: [{ role: "user", content: prompt }],
+            });
+
+            // Handle the response content correctly by checking type
+            let rawResponse = 'No response available';
+            if (response.content && response.content.length > 0) {
+                const firstContent = response.content[0];
+                // Check if it's a text block
+                if (firstContent.type === 'text') {
+                    rawResponse = firstContent.text;
+                }
+            }
+
+            this.logger.log('Raw AI Response from Anthropic:', rawResponse);
             return rawResponse;
         } catch (error) {
-            throw new Error('Failed to fetch AI response.');
+            this.logger.error(`Anthropic API error: ${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(`Failed to fetch AI response: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
-
     async determineColumnTypes(data: any[]): Promise<{ [field: string]: string }> {
         if (data.length === 0) {
             throw new Error('No data provided for type detection');
