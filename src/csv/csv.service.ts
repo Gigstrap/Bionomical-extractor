@@ -15,7 +15,7 @@ export class CsvService {
         private readonly aiService: AiService,
     ) { }
 
-    async processAndStore(fileBuffer: Buffer, originalFilename: string): Promise<{ filename: string; csvUploadId: string; importResult: any }> {
+    async processAndStore(fileBuffer: Buffer, originalFilename: string): Promise<{ filename: string; csvUploadId: string; csvCollectionName: string; importResult: any }> {
         const csvUploadId = uuidv4();
         const filename = path.basename(originalFilename, path.extname(originalFilename)).replace(/\s+/g, '_');
         const csvCollectionName = `${filename}_csv_${csvUploadId}`;
@@ -32,7 +32,7 @@ export class CsvService {
         // Insert converted data into ArangoDB
         const importResult = await this.arangoService.insertData(csvCollectionName, convertedResults);
 
-        return { filename, csvUploadId, importResult };
+        return { filename, csvUploadId, csvCollectionName, importResult };
     }
 
     private async parseCsv(fileBuffer: Buffer): Promise<any[]> {

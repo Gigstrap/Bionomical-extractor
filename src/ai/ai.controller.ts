@@ -25,15 +25,16 @@ export class AiController {
         schema: {
             example: {
                 "userPrompt": "From all the customers which one customer have the highest revenue of them all",
-                "collectionName": "ACDOCA_Sample_csv_d679d8f0-3efa-42bf-83d0-db1180a65ca0"
+                "collectionName": "ACDOCA_Sample_csv_d679d8f0-3efa-42bf-83d0-db1180a65ca0",
+                "datasetContext": "Available dataset context"
             }
         }
     })
-    async processNaturalPrompt(@Body() body: { userPrompt: string; collectionName: string }) {
-        const { userPrompt, collectionName } = body;
+    async processNaturalPrompt(@Body() body: { userPrompt: string; collectionName: string; datasetContext?: string }) {
+        const { userPrompt, collectionName, datasetContext } = body;
         if (!userPrompt) {
             throw new BadRequestException('Missing prompt parameter');
         }
-        return await this.aiService.processUserQuery(userPrompt, collectionName);
+        return await this.aiService.processUserQuery(userPrompt, collectionName, datasetContext);
     }
 }

@@ -69,7 +69,7 @@ export class AiService {
         }
     }
 
-    async processUserQuery(userQuery: string, collectionName: string) {
+    async processUserQuery(userQuery: string, collectionName: string, datasetContext?: string) {
         try {
             if (!collectionName) {
                 throw new Error('Collection name must be provided.');
@@ -86,16 +86,16 @@ export class AiService {
             // Fetch stored descriptions from ArangoDB.
             const storedDescriptions = await this.arangoService.getAIDescription(descriptionCollectionName);
 
-            // Get AI-generated AQL query including schema descriptions as additional context.
+            // Get AI-generated AQL query including schema descriptions and dataset context as additional context.
             const aiResponse = await this.fetchResponse(
-                prompts.GENERATE_AQL_QUERY(collectionName, sampleDocs, userQuery, storedDescriptions)
+                prompts.GENERATE_AQL_QUERY(collectionName, sampleDocs, userQuery, storedDescriptions, datasetContext || '')
             );
             this.logger.log('AI Response:', aiResponse);
 
-            let queryData: { collection: string; aql_query: string };
+            let queryData: { collection: string; aql_query: string; explanation: string };
             try {
                 queryData = JSON.parse(aiResponse);
-                if (!queryData.collection || !queryData.aql_query) {
+                if (!queryData.collection || !queryData.aql_query || !queryData.explanation) {
                     throw new Error('Invalid AI response format.');
                 }
             } catch (error) {
@@ -119,6 +119,7 @@ export class AiService {
                 return {
                     collection: queryData.collection,
                     aql_query: queryData.aql_query,
+                    explanation: queryData.explanation,
                     error: 'The generated AQL query failed to execute. Please refine your prompt or try again.'
                 };
             }
@@ -126,6 +127,7 @@ export class AiService {
             return {
                 collection: queryData.collection,
                 aql_query: queryData.aql_query,
+                explanation: queryData.explanation,
                 result: queryResult,
             };
         } catch (error) {
