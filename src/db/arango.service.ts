@@ -74,14 +74,32 @@ export class ArangoService implements OnModuleInit {
 
         const collection = await this.createCollection(collectionName); // Ensure collection is created
         await collection.save(doc);
+    }
 
+    // New method: Fetch stored descriptions from the description collection.
+    async getAIDescription(collectionName: string): Promise<any[]> {
+        try {
+            const collection = await this.createCollection(collectionName);
+            const query = aql`
+                FOR doc IN ${collection}
+                SORT doc.createdAt DESC
+                LIMIT 1
+                RETURN doc.descriptions
+            `;
+            const cursor = await this.db.query(query);
+            const descriptions = await cursor.next();
+            this.logger.log('Fetched AI descriptions:', descriptions);
+            return descriptions || [];
+        } catch (error) {
+            this.logger.error('Error fetching AI descriptions:', error);
+            return [];
+        }
     }
 
     async executeAqlQuery(aqlQuery: any) {
         try {
             const cursor = await this.db.query(aqlQuery);
             const result = await cursor.all();
-            this.logger.log('AQL Query Result:', result);
             return result;
         } catch (error) {
             this.logger.error('Error executing AQL query:', error);
@@ -89,19 +107,19 @@ export class ArangoService implements OnModuleInit {
         }
     }
 
-    async getSampleDocuments(collectionName: string, limit: number = 5): Promise<any[]> {
+    async getSampleDocuments(collectionName: string, limit: number): Promise<any[]> {
         try {
-            // Use this.db.collection(collectionName) to properly quote the collection name.
             const query = aql`
                 FOR doc IN ${this.db.collection(collectionName)}
                 LIMIT ${limit}
                 RETURN doc
             `;
-            return await this.executeAqlQuery(query);
+            const result = await this.executeAqlQuery(query);
+            this.logger.log(`Fetched sample documents from ${collectionName}:`, result);
+            return result;
         } catch (error) {
             this.logger.error(`Error fetching sample documents from ${collectionName}:`, error);
             return [];
         }
     }
-
 }
