@@ -52,6 +52,7 @@ export class CsvController {
                 uploadedFiles: results.map(result => ({
                     filename: result.filename,
                     csvUploadId: result.csvUploadId,
+                    csvCollectionName: result.csvCollectionName,
                     importResult: result.importResult,
                 })),
             };
