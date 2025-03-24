@@ -11,15 +11,14 @@ export class AiService {
 
     constructor(private readonly arangoService: ArangoService) { }
 
-    async generateColumnDescriptions(filename: string, csvUploadId: string, company: string) {
+    async generateColumnDescriptions(collectionName: string, company: string) {
         try {
-            const csvCollectionName = `${filename}_csv_${csvUploadId}`;
-            const descCollectionName = `${filename}_description_${csvUploadId}`;
+            const descCollectionName = `${collectionName.replace('_csv_', '_description_')}`;
 
             // Retrieve column names from the specific CSV collection.
-            const columnNames = await this.arangoService.getCollectionColumnNames(csvCollectionName);
+            const columnNames = await this.arangoService.getCollectionColumnNames(collectionName);
             if (!columnNames.length) {
-                throw new Error('No columns found for the given CSV upload ID.');
+                throw new Error('No columns found for the given CSV collection name.');
             }
 
             // Filter out unwanted fields
@@ -28,7 +27,7 @@ export class AiService {
             // Get sample data for each field and build prompt parts
             const columnSamples = await Promise.all(
                 filteredColumnNames.map(async (col) => {
-                    const samples = await this.arangoService.getColumnSampleData(csvCollectionName, col, 100);
+                    const samples = await this.arangoService.getColumnSampleData(collectionName, col, 100);
                     return { field: col, samples };
                 })
             );
@@ -38,7 +37,7 @@ export class AiService {
             });
 
             // Fetch AI-generated descriptions (without dataType info)
-            const aiResponse = await this.fetchResponse(prompts.GENERATE_COLUMN_DESCRIPTIONS(filename, csvUploadId, company, promptParts));
+            const aiResponse = await this.fetchResponse(prompts.GENERATE_COLUMN_DESCRIPTIONS(collectionName, descCollectionName, company, promptParts));
             this.logger.log('AI Response:', aiResponse);
 
             // Ensure the response is a valid JSON array
@@ -62,7 +61,7 @@ export class AiService {
 
             await this.arangoService.storeAIDescription(descCollectionName, company, descriptionsWithDataTypes);
 
-            return { csvUploadId, descriptions: descriptionsWithDataTypes };
+            return { collectionName, descriptions: descriptionsWithDataTypes };
         } catch (error) {
             this.logger.error('Error generating AI description:', error);
             throw new Error('Failed to generate column descriptions.');

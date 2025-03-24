@@ -8,14 +8,13 @@ export class AiController {
 
     @Get('description')
     async generateDescription(
-        @Query('filename') filename: string,
-        @Query('csvUploadId') csvUploadId: string,
+        @Query('collectionName') collectionName: string,
         @Query('company') company: string,
     ) {
-        if (!csvUploadId || !company || !filename) {
+        if (!collectionName || !company) {
             throw new BadRequestException('Missing required query parameters');
         }
-        const result = await this.aiService.generateColumnDescriptions(filename, csvUploadId, company);
+        const result = await this.aiService.generateColumnDescriptions(collectionName, company);
         return result;
     }
 
