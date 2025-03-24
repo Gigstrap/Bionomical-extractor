@@ -1,0 +1,16 @@
+runtime: nodejs20
+env: standard
+
+instance_class: F1
+
+automatic_scaling:
+  target_cpu_utilization: 0.65
+  min_instances: 0
+  max_instances: 10
+
+env_variables:
+  ARANGO_URL: "http://34.173.53.216:8529/"
+  ARANGO_DB_NAME: "data-generator-db"
+  ARANGO_USERNAME: "root"
+  ARANGO_PASSWORD: "yz50W9xXN4IJX0BF"
+  GROQ_API_KEY: "gsk_CCXCPjMDuKKO04HpofSuWGdyb3FY0srd42rxli8VquEOCN1VWvMgg"
