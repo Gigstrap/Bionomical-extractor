@@ -122,4 +122,9 @@ export class ArangoService implements OnModuleInit {
             return [];
         }
     }
+
+    async getCollectionExists(collectionName: string): Promise<boolean> {
+        const collection = this.db.collection(collectionName);
+        return await collection.exists();
+    }
 }

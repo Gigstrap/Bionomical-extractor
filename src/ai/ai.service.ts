@@ -3,6 +3,8 @@ import { Groq } from 'groq-sdk';
 import { ArangoService } from '../db/arango.service';
 import { prompts } from './prompts';
 import Anthropic from '@anthropic-ai/sdk';
+import * as csvParser from 'csv-parser';
+import { Readable } from 'stream';
 
 @Injectable()
 export class AiService {
@@ -13,7 +15,13 @@ export class AiService {
 
     async generateColumnDescriptions(collectionName: string, company: string) {
         try {
-            const descCollectionName = `${collectionName.replace('_csv_', '_description_')}`;
+            const descCollectionName = `${collectionName.replace('_csv', '_description')}`;
+
+            // Check if the description collection already exists
+            const descriptionExists = await this.arangoService.getCollectionExists(descCollectionName);
+            if (descriptionExists) {
+                return { collectionName, message: 'Descriptions already exists.' };
+            }
 
             // Retrieve column names from the specific CSV collection.
             const columnNames = await this.arangoService.getCollectionColumnNames(collectionName);
@@ -250,5 +258,63 @@ export class AiService {
 
         // Otherwise, return the type of the first valid value.
         return detectedTypes[0];
+    }
+
+
+    async analyzeUploadedCSV(fileBuffer: Buffer, fileDescription: string) {
+        try {
+            const rows: any[] = [];
+            const columns = new Set<string>();
+
+            // Parse CSV file
+            const stream = Readable.from(fileBuffer.toString());
+            await new Promise((resolve, reject) => {
+                stream
+                    .pipe(csvParser())
+                    .on('data', (row) => {
+                        rows.push(row);
+                        Object.keys(row).forEach((col) => columns.add(col));
+                    })
+                    .on('end', resolve)
+                    .on('error', reject);
+            });
+
+            if (rows.length === 0) {
+                throw new Error('CSV file appears to be empty.');
+            }
+
+            // Prepare column samples
+            const columnSamples = Array.from(columns).map((col) => ({
+                field: col,
+                samples: rows.slice(0, 100).map((row) => row[col]).filter(Boolean),
+            }));
+
+            // Generate AI prompt
+            const aiResponse = await this.fetchResponse(
+                prompts.ANALYZE_CSV_FILE(fileDescription, columnSamples)
+            );
+
+            // Parse AI response
+            let parsedResponse: { fileDescription: string; columnDescriptions: any[] };
+            try {
+                parsedResponse = JSON.parse(aiResponse);
+                if (!parsedResponse.fileDescription || !Array.isArray(parsedResponse.columnDescriptions)) {
+                    throw new Error('Invalid AI response format.');
+                }
+            } catch (error) {
+                this.logger.error('Failed to parse AI response:', aiResponse);
+                throw new Error('AI response is not in valid JSON format.');
+            }
+
+            // Return structured response
+            return {
+                fileDescription: parsedResponse.fileDescription,
+                columnDescriptions: parsedResponse.columnDescriptions,
+                createdAt: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error('Error analyzing uploaded CSV:', error);
+            throw new Error('Failed to analyze CSV file.');
+        }
     }
 }
