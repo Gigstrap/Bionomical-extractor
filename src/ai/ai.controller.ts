@@ -1,7 +1,8 @@
-import { Controller, Get, Query, BadRequestException, Body, Post } from '@nestjs/common';
+import { Controller, Get, Query, BadRequestException, Body, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { AiService } from './ai.service';
-import { ApiBody, ApiHeader } from '@nestjs/swagger';
-
+import { ApiBody, ApiConsumes, ApiHeader } from '@nestjs/swagger';
+import * as multer from 'multer';
+import { FileInterceptor } from '@nestjs/platform-express';
 @Controller('ai')
 export class AiController {
     constructor(private readonly aiService: AiService) { }
@@ -45,5 +46,36 @@ export class AiController {
             throw new BadRequestException('Missing prompt parameter');
         }
         return await this.aiService.processUserQuery(userPrompt, collectionName, datasetContext);
+    }
+
+
+    @Post('analyze-csv')
+    @ApiHeader({
+        name: 'x-passcode',
+        required: true,
+        description: 'Passcode for API access',
+    })
+    @ApiConsumes('multipart/form-data')
+    @UseInterceptors(
+        FileInterceptor('file', {
+            storage: multer.memoryStorage(),
+        }),
+    )
+    @ApiBody({
+        description: 'CSV file upload',
+        schema: {
+            type: 'object',
+            properties: {
+                fileDescription: { type: 'string', example: 'Description of the CSV file' },
+                file: { type: 'string', format: 'binary' },
+            },
+        },
+    })
+    async analyzeCsvFile(@UploadedFile() file: Express.Multer.File, @Body() body: { fileDescription?: string }) {
+        if (!file) {
+            throw new BadRequestException('CSV file is required.');
+        }
+
+        return await this.aiService.analyzeUploadedCSV(file.buffer, body.fileDescription);
     }
 }
