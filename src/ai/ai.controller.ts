@@ -1,26 +1,34 @@
-import { Controller, Get, Query, BadRequestException, Body, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, BadRequestException, Body, Post } from '@nestjs/common';
 import { AiService } from './ai.service';
-import { ApiBody, ApiConsumes, ApiHeader } from '@nestjs/swagger';
-import * as multer from 'multer';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiHeader } from '@nestjs/swagger';
 @Controller('ai')
 export class AiController {
     constructor(private readonly aiService: AiService) { }
 
-    @Get('description')
+    @Post('description')
     @ApiHeader({
         name: 'x-passcode',
         required: true,
         description: 'Passcode for API access',
     })
-    async generateDescription(
-        @Query('collectionName') collectionName: string,
-        @Query('company') company: string,
-    ) {
-        if (!collectionName || !company) {
-            throw new BadRequestException('Missing required query parameters');
+    @ApiBody({
+        description: 'Parameters for generating descriptions',
+        schema: {
+            example: {
+                collectionName: 'example_csv',
+                company: 'example_company',
+                fileDescription: 'This CSV contains customer data including IDs and purchase history.'
+            }
         }
-        const result = await this.aiService.generateColumnDescriptions(collectionName, company);
+    })
+    async generateDescription(
+        @Body() body: { collectionName: string; company?: string; fileDescription?: string }
+    ) {
+        const { collectionName, company, fileDescription } = body;
+        if (!collectionName) {
+            throw new BadRequestException('Missing Collection Name');
+        }
+        const result = await this.aiService.generateColumnDescriptions(collectionName, company, fileDescription);
         return result;
     }
 
@@ -35,7 +43,7 @@ export class AiController {
         schema: {
             example: {
                 "userPrompt": "From all the customers which one customer have the highest revenue of them all",
-                "collectionName": "ACDOCA_Sample_csv_d679d8f0-3efa-42bf-83d0-db1180a65ca0",
+                "collectionName": "ACDOCA_Sample_csv",
                 "datasetContext": "Available dataset context"
             }
         }
@@ -49,33 +57,4 @@ export class AiController {
     }
 
 
-    @Post('analyze-csv')
-    @ApiHeader({
-        name: 'x-passcode',
-        required: true,
-        description: 'Passcode for API access',
-    })
-    @ApiConsumes('multipart/form-data')
-    @UseInterceptors(
-        FileInterceptor('file', {
-            storage: multer.memoryStorage(),
-        }),
-    )
-    @ApiBody({
-        description: 'CSV file upload',
-        schema: {
-            type: 'object',
-            properties: {
-                fileDescription: { type: 'string', example: 'Description of the CSV file' },
-                file: { type: 'string', format: 'binary' },
-            },
-        },
-    })
-    async analyzeCsvFile(@UploadedFile() file: Express.Multer.File, @Body() body: { fileDescription?: string }) {
-        if (!file) {
-            throw new BadRequestException('CSV file is required.');
-        }
-
-        return await this.aiService.analyzeUploadedCSV(file.buffer, body.fileDescription);
-    }
 }

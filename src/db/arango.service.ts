@@ -64,35 +64,36 @@ export class ArangoService implements OnModuleInit {
     async storeAIDescription(
         collectionName: string,
         company: string,
-        descriptions: { field: string; description: string; }[]
+        fileSummary: string,
+        descriptions: { field: string; description: string; dataType: string }[]
     ) {
         const doc = {
             company,
-            descriptions, // Storing all descriptions in an array
+            fileSummary,
+            descriptions,
             createdAt: new Date(),
         };
 
-        const collection = await this.createCollection(collectionName); // Ensure collection is created
+        const collection = await this.createCollection(collectionName);
         await collection.save(doc);
     }
 
-    // New method: Fetch stored descriptions from the description collection.
-    async getAIDescription(collectionName: string): Promise<any[]> {
+    async getAIDescription(collectionName: string): Promise<{ fileSummary: string; descriptions: any[] }> {
         try {
             const collection = await this.createCollection(collectionName);
             const query = aql`
                 FOR doc IN ${collection}
                 SORT doc.createdAt DESC
                 LIMIT 1
-                RETURN doc.descriptions
+                RETURN { fileSummary: doc.fileSummary, descriptions: doc.descriptions }
             `;
             const cursor = await this.db.query(query);
-            const descriptions = await cursor.next();
-            this.logger.log('Fetched AI descriptions:', descriptions);
-            return descriptions || [];
+            const result = await cursor.next();
+            this.logger.log('Fetched AI descriptions:', result);
+            return result || { fileSummary: '', descriptions: [] };
         } catch (error) {
             this.logger.error('Error fetching AI descriptions:', error);
-            return [];
+            return { fileSummary: '', descriptions: [] };
         }
     }
 

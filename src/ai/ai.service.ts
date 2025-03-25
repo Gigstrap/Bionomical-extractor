@@ -3,8 +3,6 @@ import { Groq } from 'groq-sdk';
 import { ArangoService } from '../db/arango.service';
 import { prompts } from './prompts';
 import Anthropic from '@anthropic-ai/sdk';
-import * as csvParser from 'csv-parser';
-import { Readable } from 'stream';
 
 @Injectable()
 export class AiService {
@@ -13,26 +11,26 @@ export class AiService {
 
     constructor(private readonly arangoService: ArangoService) { }
 
-    async generateColumnDescriptions(collectionName: string, company: string) {
+    async generateColumnDescriptions(collectionName: string, company: string, fileDescription: string) {
         try {
             const descCollectionName = `${collectionName.replace('_csv', '_description')}`;
 
             // Check if the description collection already exists
             const descriptionExists = await this.arangoService.getCollectionExists(descCollectionName);
             if (descriptionExists) {
-                return { collectionName, message: 'Descriptions already exists.' };
+                return { collectionName, message: 'Descriptions already exist.' };
             }
 
-            // Retrieve column names from the specific CSV collection.
+            // Retrieve column names from the CSV collection
             const columnNames = await this.arangoService.getCollectionColumnNames(collectionName);
             if (!columnNames.length) {
                 throw new Error('No columns found for the given CSV collection name.');
             }
 
-            // Filter out unwanted fields
+            // Filter out internal fields
             const filteredColumnNames = columnNames.filter(col => !['_rev', '_key', '_id'].includes(col));
 
-            // Get sample data for each field and build prompt parts
+            // Get sample data for each field
             const columnSamples = await Promise.all(
                 filteredColumnNames.map(async (col) => {
                     const samples = await this.arangoService.getColumnSampleData(collectionName, col, 100);
@@ -44,32 +42,37 @@ export class AiService {
                 return `Field name: ${item.field}\nSamples: ${item.samples.join(', ')}`;
             });
 
-            // Fetch AI-generated descriptions (without dataType info)
-            const aiResponse = await this.fetchResponse(prompts.GENERATE_COLUMN_DESCRIPTIONS(collectionName, descCollectionName, company, promptParts));
+            // Fetch AI-generated summary and descriptions
+            const aiResponse = await this.fetchResponse(
+                prompts.GENERATE_COLUMN_DESCRIPTIONS(collectionName, company, fileDescription, promptParts)
+            );
             this.logger.log('AI Response:', aiResponse);
 
-            // Ensure the response is a valid JSON array
-            let aiDescriptions: { field: string; description: string }[];
+            // Parse AI response
+            let aiResult: { fileSummary: string; descriptions: { field: string; description: string }[] };
             try {
-                aiDescriptions = JSON.parse(aiResponse);
-                if (!Array.isArray(aiDescriptions)) {
-                    throw new Error('AI response is not a valid JSON array.');
+                aiResult = JSON.parse(aiResponse);
+                if (!aiResult.fileSummary || !Array.isArray(aiResult.descriptions)) {
+                    throw new Error('Invalid AI response format.');
                 }
             } catch (error) {
                 this.logger.error('Failed to parse AI response:', aiResponse);
                 throw new Error('AI response is not in valid JSON format.');
             }
 
-            // Merge the AI-generated description with the exact data type determined from stored samples.
-            const descriptionsWithDataTypes = aiDescriptions.map(desc => {
+            const { fileSummary, descriptions } = aiResult;
+
+            // Add data types to column descriptions
+            const descriptionsWithDataTypes = descriptions.map(desc => {
                 const sampleData = columnSamples.find(item => item.field === desc.field)?.samples || [];
                 const dataType = this.detectExactDataType(sampleData);
                 return { ...desc, dataType };
             });
 
-            await this.arangoService.storeAIDescription(descCollectionName, company, descriptionsWithDataTypes);
+            // Store the summary and descriptions
+            await this.arangoService.storeAIDescription(descCollectionName, company, fileSummary, descriptionsWithDataTypes);
 
-            return { collectionName, descriptions: descriptionsWithDataTypes };
+            return { collectionName, fileSummary, descriptions: descriptionsWithDataTypes };
         } catch (error) {
             this.logger.error('Error generating AI description:', error);
             throw new Error('Failed to generate column descriptions.');
@@ -95,7 +98,7 @@ export class AiService {
 
             // Get AI-generated AQL query including schema descriptions and dataset context as additional context.
             const aiResponse = await this.fetchResponse(
-                prompts.GENERATE_AQL_QUERY(collectionName, sampleDocs, userQuery, storedDescriptions, datasetContext || '')
+                prompts.GENERATE_AQL_QUERY(collectionName, sampleDocs, userQuery, storedDescriptions.descriptions, datasetContext || '')
             );
             this.logger.log('AI Response:', aiResponse);
 
@@ -260,61 +263,4 @@ export class AiService {
         return detectedTypes[0];
     }
 
-
-    async analyzeUploadedCSV(fileBuffer: Buffer, fileDescription: string) {
-        try {
-            const rows: any[] = [];
-            const columns = new Set<string>();
-
-            // Parse CSV file
-            const stream = Readable.from(fileBuffer.toString());
-            await new Promise((resolve, reject) => {
-                stream
-                    .pipe(csvParser())
-                    .on('data', (row) => {
-                        rows.push(row);
-                        Object.keys(row).forEach((col) => columns.add(col));
-                    })
-                    .on('end', resolve)
-                    .on('error', reject);
-            });
-
-            if (rows.length === 0) {
-                throw new Error('CSV file appears to be empty.');
-            }
-
-            // Prepare column samples
-            const columnSamples = Array.from(columns).map((col) => ({
-                field: col,
-                samples: rows.slice(0, 100).map((row) => row[col]).filter(Boolean),
-            }));
-
-            // Generate AI prompt
-            const aiResponse = await this.fetchResponse(
-                prompts.ANALYZE_CSV_FILE(fileDescription, columnSamples)
-            );
-
-            // Parse AI response
-            let parsedResponse: { fileDescription: string; columnDescriptions: any[] };
-            try {
-                parsedResponse = JSON.parse(aiResponse);
-                if (!parsedResponse.fileDescription || !Array.isArray(parsedResponse.columnDescriptions)) {
-                    throw new Error('Invalid AI response format.');
-                }
-            } catch (error) {
-                this.logger.error('Failed to parse AI response:', aiResponse);
-                throw new Error('AI response is not in valid JSON format.');
-            }
-
-            // Return structured response
-            return {
-                fileDescription: parsedResponse.fileDescription,
-                columnDescriptions: parsedResponse.columnDescriptions,
-                createdAt: new Date().toISOString(),
-            };
-        } catch (error) {
-            this.logger.error('Error analyzing uploaded CSV:', error);
-            throw new Error('Failed to analyze CSV file.');
-        }
-    }
 }

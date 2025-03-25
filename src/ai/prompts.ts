@@ -53,47 +53,30 @@ export const prompts = {
       }
       
       **Note**: Do not include any explanations, comments, or additional text beyond the JSON response. And dont return response in code blocks, only expected json.`,
-  GENERATE_COLUMN_DESCRIPTIONS: (filename: string, csvUploadId: string, company: string, promptParts: string[]) => `You are given data from the company "${company}" uploaded in CSV file "${filename}" (ID: "${csvUploadId}"). 
-  For each field, use the field name and the first 100 sample values to generate a descriptive explanation of what the field represents. So please analyze what each field is about and write a detailed description.
-  
-  ${promptParts.join('\n')}
-  
-  Return the response as a valid JSON array with objects in this format:
-  [
-    { "field": "fieldName", "description": "description of field" },
-    { "field": "fieldName", "description": "description of field" }
-  ]
-    and don't add any additional text or code blocks to the response.`,
+  GENERATE_COLUMN_DESCRIPTIONS: (collectionName: string, company: string, fileDescription: string, promptParts: string[]) => `
+      You are given data from the industry "${company}" uploaded in CSV file "${collectionName}". 
+      The user provided the following description of the file: "${fileDescription}"
+
+      For each field, use the field name and the first 100 sample values to generate a descriptive explanation of what the field represents.
+
+      ${promptParts.join('\n')}
+
+      Based on the provided information and the user's description, generate a structured JSON response with:
+      1. A summary of the overall file, taking into account the user's description.
+      2. A description of each column, explaining what it represents.
+
+      Return the response as a valid JSON object in this format:
+      {
+        "fileSummary": "summary of the overall file",
+        "descriptions": [
+          { "field": "fieldName", "description": "description of field" },
+          { "field": "fieldName", "description": "description of field" }
+        ]
+      }
+
+      **Note**: Do not include any code blocks, explanations, comments, or additional text beyond the JSON response.
+  `,
 
   IDENTIFY_DATA_TYPES: () => `You are given data from a CSV file. For each field, use the field name and the provided sample values to determine the most appropriate data type. Possible types are: string, integer, float, boolean, date. Do not include any explanations, comments, or additional text beyond the JSON response. And dont return response in code blocks, only expected json. Return the response as a JSON array with objects in this format: [{ "field": "fieldName", "type": "dataType" }]`,
 
-  ANALYZE_CSV_FILE: (fileDescription: string, columnSamples: { field: string; samples: string[] }[]) => `
-        You are an AI that specializes in analyzing CSV files and summarizing their contents.
-        
-        The user uploaded a CSV file with the following description:
-        "${fileDescription}"
-        
-        Here are some column samples from the file:
-        ${columnSamples
-      .map((col) => `Field name: ${col.field}\nSamples: ${col.samples.join(', ')}`)
-      .join('\n\n')}
-        
-        Based on the above information, generate a structured JSON response with:
-        1. A summary of the overall file.
-        2. A description of each column, explaining what it represents.
-        
-        The response should be formatted json like this:
-        {
-          "fileDescription": "summary of overall file",
-          "columnDescriptions": [
-            {
-              "field": "column_name",
-              "description": "Detailed explanation of the column."
-            }
-          ],
-          "createdAt": "2025-03-25T13:59:20.624Z"
-        }
-
-        Note: Do not include any explanations, comments, or additional text beyond the JSON response. And dont return response in code blocks, only expected json.
-    `,
 };
