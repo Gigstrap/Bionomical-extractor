@@ -4,6 +4,8 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+    // Enable CORS with default settings
+    app.enableCors();
   const config = new DocumentBuilder()
     .setTitle('Data Description Generator')
     .setDescription('The Data Description Generator API description')

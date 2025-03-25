@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { ApiHeader } from '@nestjs/swagger';
 import { Database } from 'arangojs';
 
 @Controller('collections')
@@ -14,6 +15,11 @@ export class CollectionsController {
   }
 
   @Get()
+      @ApiHeader({
+          name: 'x-passcode',
+          required: true,
+          description: 'Passcode for API access',
+      })
   async getCollections(): Promise<string[]> {
     try {
       const collections = await this.db.listCollections();

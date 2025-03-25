@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { PasscodeMiddleware } from './middleware/passcode.middleware';
+import { CollectionsController } from './collections/collections.controller';
 
 @Module({
   imports: [
