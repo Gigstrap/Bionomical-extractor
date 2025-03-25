@@ -13,7 +13,13 @@ export class AiService {
 
     async generateColumnDescriptions(collectionName: string, company: string) {
         try {
-            const descCollectionName = `${collectionName.replace('_csv_', '_description_')}`;
+            const descCollectionName = `${collectionName.replace('_csv', '_description')}`;
+
+            // Check if the description collection already exists
+            const descriptionExists = await this.arangoService.getCollectionExists(descCollectionName);
+            if (descriptionExists) {
+                return { collectionName, message: 'Descriptions already exists.' };
+            }
 
             // Retrieve column names from the specific CSV collection.
             const columnNames = await this.arangoService.getCollectionColumnNames(collectionName);

@@ -44,14 +44,25 @@ export class CsvController {
 
         try {
             const results = await Promise.all(
-                files.map(file => this.csvService.processAndStore(file.buffer, file.originalname))
+                files.map(file => this.csvService.csvFileUpload(file.buffer, file.originalname))
             );
 
+            // Filter out any results that indicate the file already exists
+            const existingFiles = results.filter(result => result.message);
+            if (existingFiles.length > 0) {
+                return {
+                    message: 'Some files were not uploaded because they already exist.',
+                    existingFiles: existingFiles.map(result => ({
+                        filename: result.filename,
+                        csvCollectionName: result.csvCollectionName,
+                        message: result.message,
+                    })),
+                };
+            }
             return {
                 message: 'CSV files processed and stored successfully',
                 uploadedFiles: results.map(result => ({
                     filename: result.filename,
-                    csvUploadId: result.csvUploadId,
                     csvCollectionName: result.csvCollectionName,
                     importResult: result.importResult,
                 })),

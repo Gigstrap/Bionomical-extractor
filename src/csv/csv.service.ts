@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Readable } from 'stream';
 import * as csvParser from 'csv-parser';
 import * as path from 'path';
-import { v4 as uuidv4 } from 'uuid';
 import { ArangoService } from '../db/arango.service';
 import { AiService } from '../ai/ai.service';
 
@@ -15,10 +14,15 @@ export class CsvService {
         private readonly aiService: AiService,
     ) { }
 
-    async processAndStore(fileBuffer: Buffer, originalFilename: string): Promise<{ filename: string; csvUploadId: string; csvCollectionName: string; importResult: any }> {
-        const csvUploadId = uuidv4();
+    async csvFileUpload(fileBuffer: Buffer, originalFilename: string): Promise<{ filename: string; csvUploadId?: string; csvCollectionName: string; importResult?: any; message?: string }> {
         const filename = path.basename(originalFilename, path.extname(originalFilename)).replace(/\s+/g, '_');
-        const csvCollectionName = `${filename}_csv_${csvUploadId}`;
+        const csvCollectionName = `${filename}_csv`;
+
+        // Check if the collection already exists
+        const collectionExists = await this.arangoService.getCollectionExists(csvCollectionName);
+        if (collectionExists) {
+            return { filename, csvCollectionName, message: 'This file has already been uploaded.' };
+        }
 
         // Parse CSV into an array of objects
         const results = await this.parseCsv(fileBuffer);
@@ -32,7 +36,7 @@ export class CsvService {
         // Insert converted data into ArangoDB
         const importResult = await this.arangoService.insertData(csvCollectionName, convertedResults);
 
-        return { filename, csvUploadId, csvCollectionName, importResult };
+        return { filename, csvCollectionName, importResult };
     }
 
     private async parseCsv(fileBuffer: Buffer): Promise<any[]> {
