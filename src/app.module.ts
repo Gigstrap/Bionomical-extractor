@@ -6,13 +6,14 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { PasscodeMiddleware } from './middleware/passcode.middleware';
+import { CollectionsController } from './collections/collections.controller';
 
 @Module({
   imports: [
     AiModule,
     CsvModule,
     ConfigModule.forRoot()],
-  controllers: [AppController],
+  controllers: [AppController, CollectionsController],
   providers: [
     ArangoService, AppService],
 })
