@@ -18,7 +18,9 @@ export class AiService {
             // Check if the description collection already exists
             const descriptionExists = await this.arangoService.getCollectionExists(descCollectionName);
             if (descriptionExists) {
-                return { collectionName, message: 'Descriptions already exist.' };
+                // Fetch and return existing descriptions
+                const existingDescriptions = await this.arangoService.getAIDescription(descCollectionName);
+                return { collectionName, ...existingDescriptions };
             }
 
             // Retrieve column names from the CSV collection
