@@ -1,7 +1,7 @@
 import { Controller, Post, UseInterceptors, UploadedFiles, BadRequestException } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { CsvService } from './csv.service';
-import { ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiConsumes, ApiBody, ApiHeader } from '@nestjs/swagger';
 import * as multer from 'multer';
 
 @Controller('csv')
@@ -25,6 +25,11 @@ export class CsvController {
                 },
             },
         },
+    })
+    @ApiHeader({
+        name: 'x-passcode',
+        required: true,
+        description: 'Passcode for API access',
     })
     @UseInterceptors(
         FilesInterceptor('files', undefined, { // Allow up to 10 files at once

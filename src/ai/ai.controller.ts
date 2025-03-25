@@ -1,12 +1,17 @@
 import { Controller, Get, Query, BadRequestException, Body, Post } from '@nestjs/common';
 import { AiService } from './ai.service';
-import { ApiBody } from '@nestjs/swagger';
+import { ApiBody, ApiHeader } from '@nestjs/swagger';
 
 @Controller('ai')
 export class AiController {
     constructor(private readonly aiService: AiService) { }
 
     @Get('description')
+    @ApiHeader({
+        name: 'x-passcode',
+        required: true,
+        description: 'Passcode for API access',
+    })
     async generateDescription(
         @Query('collectionName') collectionName: string,
         @Query('company') company: string,
@@ -19,6 +24,11 @@ export class AiController {
     }
 
     @Post('prompt')
+    @ApiHeader({
+        name: 'x-passcode',
+        required: true,
+        description: 'Passcode for API access',
+    })
     @ApiBody({
         description: 'User prompt to process',
         schema: {
