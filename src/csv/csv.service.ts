@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ConflictException } from '@nestjs/common';
 import { Readable } from 'stream';
 import * as csvParser from 'csv-parser';
 import * as path from 'path';
@@ -21,7 +21,7 @@ export class CsvService {
         // Check if the collection already exists
         const collectionExists = await this.arangoService.getCollectionExists(csvCollectionName);
         if (collectionExists) {
-            return { filename, csvCollectionName, message: 'This file has already been uploaded.' };
+            throw new ConflictException('This file has already been uploaded.');
         }
 
         // Parse CSV into an array of objects
