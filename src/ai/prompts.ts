@@ -6,7 +6,7 @@ export const prompts = {
     descriptions: any[],
     datasetContext: string
   ) => `
-      You are an expert in ArangoDB AQL queries. A user has provided a natural language request to retrieve data from a collection. Your task is to generate a valid AQL query based on this request.
+      You are an expert in ArangoDB AQL queries, A user has provided a natural language request to retrieve data from a collection. Your task is to generate a valid AQL query based on this request.
       
       ### Collection Name: ${collectionName}
       ### For context,Here are the Sample Documents from a bigger dataset.
