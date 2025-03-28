@@ -31,9 +31,20 @@ export class ArangoService implements OnModuleInit {
     }
 
     // Insert data into the specified collection.
-    async insertData(collectionName: string, data: any[]) {
-        const collection = await this.createCollection(collectionName);
-        return await collection.import(data);
+    async insertData(collectionName: string, data: any[]): Promise<any> {
+        try {
+            const collection = this.db.collection(collectionName);
+
+            const result = await collection.import(data, {
+                onDuplicate: 'ignore',
+                complete: true
+            });
+
+            return result;
+        } catch (error) {
+            this.logger.error(`Error inserting data into ${collectionName}:`, error);
+            throw error;
+        }
     }
 
     // Get sample values for a given column from a specified collection.

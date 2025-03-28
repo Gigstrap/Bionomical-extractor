@@ -1,54 +1,116 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Readable } from 'stream';
 import * as csvParser from 'csv-parser';
 import * as path from 'path';
 import { ArangoService } from '../db/arango.service';
 import { AiService } from '../ai/ai.service';
+import { createReadStream, unlink } from 'fs';
 
 @Injectable()
 export class CsvService {
     private readonly logger = new Logger(CsvService.name);
+    private readonly BATCH_SIZE = 50000; // Configurable batch size
 
     constructor(
         private readonly arangoService: ArangoService,
         private readonly aiService: AiService,
     ) { }
 
-    async csvFileUpload(fileBuffer: Buffer, originalFilename: string): Promise<{ filename: string; csvUploadId?: string; csvCollectionName: string; importResult?: any; message?: string }> {
+    async csvFileUpload(filePath: string, originalFilename: string): Promise<{ filename: string; csvUploadId?: string; csvCollectionName: string; message?: string, statusCode: number }> {
         const filename = path.basename(originalFilename, path.extname(originalFilename)).replace(/\s+/g, '_');
         const csvCollectionName = `${filename}_csv`;
 
         // Check if the collection already exists
         const collectionExists = await this.arangoService.getCollectionExists(csvCollectionName);
         if (collectionExists) {
-            return { filename, csvCollectionName, message: 'This file has already been uploaded.' };
+            return { filename, csvCollectionName, message: 'The file with same name already exists.', statusCode: 409 };
         }
 
-        // Parse CSV into an array of objects
-        const results = await this.parseCsv(fileBuffer);
+        // Create collection before starting the import
+        await this.arangoService.createCollection(csvCollectionName);
 
-        // Determine column types using AI
-        const columnTypes = await this.aiService.determineColumnTypes(results);
+        // Process the file in streaming mode
+        const { totalRows } = await this.processFileInBatches(filePath, csvCollectionName);
 
-        // Convert data to the detected types
-        const convertedResults = this.convertDataTypes(results, columnTypes);
+        return {
+            filename,
+            csvCollectionName,
+            message: `File Uploaded Successfully. Total Rows: ${totalRows}`,
+            statusCode: 201
 
-        // Insert converted data into ArangoDB
-        const importResult = await this.arangoService.insertData(csvCollectionName, convertedResults);
-
-        return { filename, csvCollectionName, importResult };
+        };
     }
 
-    private async parseCsv(fileBuffer: Buffer): Promise<any[]> {
+    private async processFileInBatches(filePath: string, csvCollectionName: string): Promise<{ totalRows: number, columnTypes: any }> {
         return new Promise((resolve, reject) => {
-            const results = [];
-            const stream = Readable.from(fileBuffer);
-            stream
+            let currentBatch: any[] = [];
+            let totalRows = 0;
+            let columnTypes: any = null;
+            let isFirstBatch = true;
+
+            const stream = createReadStream(filePath)
                 .pipe(csvParser())
-                .on('data', (data) => results.push(data))
-                .on('end', () => resolve(results))
-                .on('error', (error) => reject(error));
+                .on('data', async (data) => {
+                    currentBatch.push(data);
+                    totalRows++;
+
+                    if (currentBatch.length >= this.BATCH_SIZE) {
+                        stream.pause(); // Pause the stream while processing the batch
+
+                        try {
+                            if (isFirstBatch) {
+                                // Determine column types only from the first batch
+                                columnTypes = await this.aiService.determineColumnTypes(currentBatch);
+                                isFirstBatch = false;
+                            }
+
+                            // Convert and insert the batch
+                            await this.processBatch(currentBatch, columnTypes, csvCollectionName);
+
+                            this.logger.log(`Processed ${totalRows} rows so far...`);
+                            currentBatch = []; // Clear the batch
+                            stream.resume(); // Resume the stream
+                        } catch (error) {
+                            stream.destroy(error); // Destroy the stream on error
+                        }
+                    }
+                })
+                .on('end', async () => {
+                    try {
+                        // Process any remaining records
+                        if (currentBatch.length > 0) {
+                            if (isFirstBatch) {
+                                columnTypes = await this.aiService.determineColumnTypes(currentBatch);
+                            }
+                            await this.processBatch(currentBatch, columnTypes, csvCollectionName);
+                        }
+
+                        // Clean up
+                        unlink(filePath, (err) => {
+                            if (err) this.logger.error(`Error deleting file: ${err}`);
+                        });
+
+                        resolve({ totalRows, columnTypes });
+                    } catch (error) {
+                        reject(error);
+                    }
+                })
+                .on('error', (error) => {
+                    reject(error);
+                });
         });
+    }
+
+    private async processBatch(batch: any[], columnTypes: any, csvCollectionName: string): Promise<void> {
+        try {
+            // Convert data types
+            const convertedBatch = this.convertDataTypes(batch, columnTypes);
+
+            // Insert the batch into ArangoDB
+            await this.arangoService.insertData(csvCollectionName, convertedBatch);
+        } catch (error) {
+            this.logger.error(`Error processing batch: ${error}`);
+            throw error;
+        }
     }
 
     private convertDataTypes(data: any[], typeMap: { [field: string]: string }): any[] {
