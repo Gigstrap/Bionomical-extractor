@@ -3,7 +3,6 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { CsvService } from './csv.service';
 import { ApiConsumes, ApiBody, ApiHeader } from '@nestjs/swagger';
 import * as multer from 'multer';
-import { existsSync, mkdirSync } from 'fs';
 
 @Controller('csv')
 export class CsvController {
@@ -56,12 +55,6 @@ export class CsvController {
         }),
     )
     async uploadCsv(@UploadedFiles() files: Express.Multer.File[]) {
-        // Ensure the uploads directory exists
-        const uploadsDir = './uploads';
-        if (!existsSync(uploadsDir)) {
-            mkdirSync(uploadsDir); // Create the directory if it doesn't exist
-        }
-
         if (!files || files.length === 0) {
             throw new BadRequestException('No files uploaded');
         }
@@ -101,5 +94,6 @@ export class CsvController {
         } catch (error) {
             throw new BadRequestException('Error processing CSV files');
         }
+
     }
 }
